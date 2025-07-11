@@ -10,7 +10,7 @@ OPTIONS = {
     'includes': [
        'datetime', 'pytz', 'unicodedata', 'cmath'
     ],
-    'packages': ['pandas', 'openpyxl', 'numpy', 'dateutil'],
+    'packages': ['pandas', 'openpyxl', 'numpy', 'dateutil', 'selenium'],
     'excludes': ['tkinter'],  # 충돌 방지용
     'plist': {
         'CFBundleName': 'NaverRankChecker',
@@ -33,4 +33,11 @@ setup(
     data_files=DATA_FILES,
     options={'py2app': OPTIONS},
     setup_requires=['py2app'],
+    install_requires=[
+        'selenium',
+        'pandas',
+        'openpyxl',
+        'numpy',
+        'python-dateutil',
+    ]
 )
