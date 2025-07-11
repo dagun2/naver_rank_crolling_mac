@@ -16,8 +16,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 def get_executable_dir():
     if getattr(sys, 'frozen', False):
-        rexe_dir = os.path.dirname(sys.executable)
-        return os.path.abspath(os.path.join(exe_dir, "../.."))
+        return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
 
 
@@ -30,12 +29,12 @@ error_log = ""
 
 try:
     exe_dir = get_executable_dir()
+    base_dir = os.path.abspath(os.path.join(exe_dir, ".."))  # ⬅️ 수정된 부분
     now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_path = os.path.join(exe_dir, f"log_{now_str}.txt")
     err_path = os.path.join(exe_dir, "error_log.txt")
 
     # ─── 기본 디렉토리 ───────────────────────────────────
-    base_dir = exe_dir
     log += f"[경로] base_dir: {base_dir}\n"
 
     # ─── 엑셀 파일 탐색 ─────────────────────────────────
