@@ -7,10 +7,6 @@ on:
     types: [created]
   workflow_dispatch:
 
-permissions:
-  contents: write      # 레포지토리 컨텐츠(코드) 읽기/쓰기
-  packages: write      # 패키지 퍼블리싱 권한 (필요 시)
-
 jobs:
   build:
     runs-on: macos-latest
