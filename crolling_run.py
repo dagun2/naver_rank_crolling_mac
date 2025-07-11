@@ -16,8 +16,9 @@ from selenium.webdriver.support import expected_conditions as EC
 
 def get_executable_dir():
     if getattr(sys, 'frozen', False):
-        return os.path.dirname(os.path.abspath(sys.argv[0]))  # <- 핵심 수정
-    return os.path.dirname(os.path.abspath(__file__))
+        return os.path.abspath(os.path.join(os.path.dirname(sys.executable), "../../../"))
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
 
 
 def normalize_url(url: str) -> str:
