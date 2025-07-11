@@ -8,10 +8,23 @@ OPTIONS = {
     'emulate_shell_environment': True,
     'redirect_stdout_to_asl': True,
     'includes': [
-        'datetime', 'pytz', 'unicodedata', 'cmath'
+        'datetime',
+        'pytz',
+        'unicodedata',
+        'cmath',                            # C-확장 모듈
+        'pandas._libs.testing',            # pandas 테스트용 C-모듈
+        'pandas._libs.tslibs.timezones',    # pandas 시간대 처리용 C-모듈
     ],
-    'packages': ['pandas', 'openpyxl', 'numpy', 'dateutil'],
-    'excludes': ['tkinter'],  # 충돌 방지용
+    'packages': [
+        'pandas',
+        'openpyxl',
+        'numpy',
+        'dateutil',
+    ],
+    'excludes': [
+        'tkinter',        # GUI 미사용 시 제외
+        'pandas._testing' # 순위 체크엔 불필요한 테스트 코드
+    ],
     'plist': {
         'CFBundleName': 'NaverRankChecker',
         'CFBundleDisplayName': 'NaverRankChecker',
@@ -24,8 +37,7 @@ OPTIONS = {
             'LANG': 'en_US.UTF-8',
             'LC_ALL': 'en_US.UTF-8'
         }
-    },
-    # 'iconfile': 'icon.icns',
+    }
 }
 
 setup(
