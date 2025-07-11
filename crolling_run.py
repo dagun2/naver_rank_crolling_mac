@@ -16,7 +16,8 @@ from selenium.webdriver.support import expected_conditions as EC
 
 def get_executable_dir():
     if getattr(sys, 'frozen', False):
-        return os.path.dirname(sys.executable)
+        rexe_dir = os.path.dirname(sys.executable)
+        return os.path.abspath(os.path.join(exe_dir, "../.."))
     return os.path.dirname(os.path.abspath(__file__))
 
 
