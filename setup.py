@@ -5,7 +5,7 @@ OPTIONS = {
     "argv_emulation": True,      # 디버깅 시 콘솔 로그 보기 위해 켜 두셔도 좋습니다
     "plist": {
         "CFBundleName": "NaverRankChecker",
-        "CFBundleDisplayName": "네이버 순위체크",
+        "CFBundleDisplayName": "네이버순위체크",
         "CFBundleIdentifier": "com.yourname.naver-rank-checker",
         "CFBundleVersion": "1.0.0",
     },
