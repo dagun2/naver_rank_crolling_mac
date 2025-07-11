@@ -50,3 +50,19 @@ jobs:
         with:
           name: macos-app
           path: NaverRankChecker.zip
+
+      # A) 릴리즈 생성 (태그 기반)
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/[action-gh-release](https://github.com/softprops/action-gh-release)@v1
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: Release v1.0.${{ github.run_number }}
+          draft: false
+          prerelease: false
+
+      # B) 릴리즈 자산으로 ZIP 업로드
+      - name: Upload ZIP to Release
+        uses: softprops/[action-gh-release](https://github.com/softprops/action-gh-release)@v1
+        with:
+          files: NaverRankChecker.zip
