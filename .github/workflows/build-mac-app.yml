@@ -21,8 +21,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python3 -m pip install --upgrade pip
-          pip install py2app pandas openpyxl XlsxWriter
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Clean old build
         run: rm -rf build dist *.egg-info
