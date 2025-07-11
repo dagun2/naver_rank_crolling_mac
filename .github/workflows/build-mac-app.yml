@@ -7,11 +7,9 @@ on:
     types: [created]
   workflow_dispatch:
 
-# 여기에 permissions 블록을 추가
 permissions:
   contents: write      # 레포지토리 컨텐츠(코드) 읽기/쓰기
   packages: write      # 패키지 퍼블리싱 권한 (필요 시)
-  releases: write      # Release 생성/업데이트 권한  
 
 jobs:
   build:
@@ -28,12 +26,10 @@ jobs:
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip install py2app pandas openpyxl
-          pip install XlsxWriter
+          pip install py2app pandas openpyxl XlsxWriter
 
       - name: Clean old build
-        run: |
-          rm -rf build dist *.egg-info
+        run: rm -rf build dist *.egg-info
 
       - name: Build app
         run: python3 setup.py py2app
