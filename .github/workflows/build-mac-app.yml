@@ -1,68 +1,45 @@
-name: Build Mac App
+name: Build macOS App and Release
 
-# main 브랜치에 푸시될 때, 혹은 수동으로 실행할 때 동작
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build-mac:
-    # macOS 호스트에서 실행
+  build:
     runs-on: macos-latest
 
     steps:
-      # 1) 코드 체크아웃
       - uses: actions/checkout@v3
 
-      # 2) 원하는 Python 버전 설치
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.11"
+          python-version: '3.10'
 
-      # 3) pip 캐시 (속도 향상)
-      - name: Cache pip
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: python-pip-${{ hashFiles('**/requirements.txt') }}
-
-      # 4) 의존성 설치
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
+          python3 -m pip install --upgrade pip
+          pip install py2app pandas openpyxl
+          pip install XlsxWriter
 
-      # 5) py2app 으로 .app 빌드
-      - name: Build .app with py2app
-        run: python setup.py py2app
-
-      # 6) dist/MyApp.app 을 ZIP으로 묶기
-      - name: Package .app into zip
+      - name: Clean old build
         run: |
-          # MyApp.app 이름은 setup.py 에 정의한 APP 이름과 같아야 합니다.
-          ditto -c -k --sequesterRsrc --keepParent dist/NaverRankChecker.app NaverRankChecker.zip
+          rm -rf build dist *.egg-info
 
-      # 7) ZIP을 GitHub 아티팩트로 업로드
-      - name: Upload ZIP artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: macos-app
-          path: NaverRankChecker.zip
+      - name: Build app
+        run: python3 setup.py py2app
 
-      # A) 릴리즈 생성 (태그 기반)
-      - name: Create GitHub Release
-        id: create_release
-        uses: softprops/[action-gh-release](https://github.com/softprops/action-gh-release)@v1
+      - name: Zip the app
+        run: |
+          cd dist
+          zip -r NaverRankChecker.zip NaverRankChecker.app
+
+      - name: Create GitHub Release and Upload
+        uses: softprops/action-gh-release@v1
         with:
+          name: NaverRankChecker
           tag_name: v1.0.${{ github.run_number }}
-          name: Release v1.0.${{ github.run_number }}
-          draft: false
-          prerelease: false
-
-      # B) 릴리즈 자산으로 ZIP 업로드
-      - name: Upload ZIP to Release
-        uses: softprops/[action-gh-release](https://github.com/softprops/action-gh-release)@v1
-        with:
-          files: NaverRankChecker.zip
+          files: dist/NaverRankChecker.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
