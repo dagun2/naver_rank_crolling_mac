@@ -16,8 +16,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 def get_executable_dir():
     if getattr(sys, 'frozen', False):
-        # py2app 실행 환경일 때는 .app이 위치한 폴더를 정확히 지정
-        return os.path.abspath(os.path.join(os.path.dirname(sys.executable), "../.."))
+        return os.path.dirname(os.path.abspath(sys.argv[0]))  # <- 핵심 수정
     return os.path.dirname(os.path.abspath(__file__))
 
 
