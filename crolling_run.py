@@ -2,7 +2,6 @@ import os
 import sys
 import unicodedata
 import traceback
-
 import pandas as pd
 from datetime import datetime
 from selenium import webdriver
@@ -13,13 +12,17 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# 홈 디렉토리에 로그 파일 열기
-logfile = os.path.expanduser("~/NaverRankChecker_launch.log")
-f = open(logfile, "a", encoding="utf-8")
-# stdout, stderr 를 모두 여기에 붙여쓰기
-sys.stdout = f
-sys.stderr = f
-print(f"\n===== Launch at {datetime.now()} =====", flush=True)
+# ───── 출력 리디렉션 시작 ─────
+ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+log_dir = os.path.expanduser("~/naver_logs")
+os.makedirs(log_dir, exist_ok=True)
+
+LOG_PATH = os.path.join(log_dir, f"naver_rank_{ts}.log")
+ERR_PATH = os.path.join(log_dir, f"naver_rank_error.log")
+
+sys.stdout = open(LOG_PATH, 'w', encoding='utf-8', buffering=1)
+sys.stderr = open(ERR_PATH, 'a', encoding='utf-8', buffering=1)
+# ───── 리디렉션 끝 ─────
 
 def get_base_dir():
     if getattr(sys, 'frozen', False):
@@ -55,11 +58,7 @@ def main():
 
         # ─── 셀레니움 & 크롤링 설정 ─────────────────────────────────
         target_classes = {
-            "info_title",
-            "link_tit",
-            "link_question",
-            "title_link",
-            "fds-comps-right-image-text-title",
+            "info_title", "link_tit", "link_question", "title_link", "fds-comps-right-image-text-title"
         }
         anchor_selector = ",".join(f"a[class*='{c}']" for c in target_classes)
 
@@ -92,7 +91,6 @@ def main():
             found = False
 
             for b_idx, block in enumerate(blocks, start=1):
-                # 그룹명 추출
                 try:
                     group_title = block.find_element(By.CSS_SELECTOR, "h2.title").text.strip()
                 except:
@@ -164,31 +162,21 @@ def main():
         log += f"\n✅ 결과 저장 완료: {out_path}\n"
 
     except Exception as e:
-        error_log += f"\n❌ 오류 발생: {e}\n"
-        error_log += traceback.format_exc() + "\n"
-
-    # ─── 로그 기록 ─────────────────────────────────────────────
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # 기본 로그
-    log_path = os.path.expanduser(f"~/naver_rank_{ts}_log.txt")
-    with open(log_path, "w", encoding="utf-8") as f:
-        f.write(log)
-    print(f"\n📝 로그 저장: {log_path}")
-
-    # 에러 로그가 있으면
-    if error_log:
-        err_path = os.path.expanduser(f"~/naver_rank_error_log.txt")
-        with open(err_path, "a", encoding="utf-8") as f:
+        error_log = f"\n❌ 오류 발생: {e}\n" + traceback.format_exc()
+        with open(ERR_PATH, "a", encoding="utf-8") as f:
             f.write(f"\n[{ts}]\n")
             f.write(error_log)
-        print(f"⚠️ 에러 로그 기록: {err_path}")
-        # macOS 일 경우 Console.app 으로 열기
-        if sys.platform == "darwin":
-            os.system(f"open '{err_path}'")
+        log += f"⚠️ 에러 발생, 자세한 내용은 error_log 확인\n"
 
-    # 종료 코드
-    if error_log:
-        sys.exit(1)
+    # ─── 로그 출력 경로 안내 ─────
+    print(log)
+    print(f"\n📝 로그 저장: {LOG_PATH}")
+    if os.path.exists(ERR_PATH):
+        print(f"⚠️ 에러 로그 확인: {ERR_PATH}")
+
+    # macOS에서 콘솔로 열기
+    if sys.platform == "darwin":
+        os.system(f"open '{LOG_PATH}'")
 
 if __name__ == "__main__":
     main()
