@@ -1,31 +1,37 @@
 from setuptools import setup
 
-APP = ["crolling_run.py"]
+APP = ['crolling_run.py']
+DATA_FILES = []
+
 OPTIONS = {
-    "argv_emulation": True,      # 디버깅 시 콘솔 로그 보기 위해 켜 두셔도 좋습니다
-    "plist": {
-        "CFBundleName": "NaverRankChecker",
-        "CFBundleDisplayName": "NaverRankChecker",
-        "CFBundleIdentifier": "com.yourname.naver-rank-checker",
-        "CFBundleVersion": "1.0.0",
-    },
-    'packages': [
-        # pandas 내부 C 확장도 통째로 묶어 줍니다
-        'pandas', 'numpy',
-        # 기타 엑셀 입출력용 패키지
-        'openpyxl', 'xlsxwriter'
-    ],
+    'argv_emulation': False,
+    'emulate_shell_environment': True,
+    'redirect_stdout_to_asl': True,
     'includes': [
-        # 표준 라이브러리 cmath를 강제로 포함
-        'cmath',
-        # pandas._libs.testing 같은 숨은 확장 모듈도 포함
-        'pandas._libs.testing',
+        'datetime', 'pytz', 'unicodedata', 'cmath'
     ],
-    # 필요하다면 excludes / optimize 등 추가 설정
+    'packages': ['pandas', 'openpyxl', 'numpy', 'dateutil'],
+    'excludes': ['tkinter'],  # 충돌 방지용
+    'plist': {
+        'CFBundleName': 'NaverRankChecker',
+        'CFBundleDisplayName': 'NaverRankChecker',
+        'CFBundleIdentifier': 'com.midnightaxi.NaverRankChecker',
+        'CFBundleVersion': '1.0.0',
+        'CFBundleShortVersionString': '1.0.0',
+        'NSHighResolutionCapable': True,
+        'LSEnvironment': {
+            'PYTHONIOENCODING': 'utf-8',
+            'LANG': 'en_US.UTF-8',
+            'LC_ALL': 'en_US.UTF-8'
+        }
+    },
+    # 'iconfile': 'icon.icns',
 }
 
 setup(
     app=APP,
-    options={"py2app": OPTIONS},
-    setup_requires=["py2app"],
+    name='NaverRankChecker',
+    data_files=DATA_FILES,
+    options={'py2app': OPTIONS},
+    setup_requires=['py2app'],
 )
