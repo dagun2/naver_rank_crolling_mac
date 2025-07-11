@@ -12,17 +12,16 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# ───── 출력 리디렉션 시작 ─────
-ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-log_dir = os.path.expanduser("~/naver_logs")
-os.makedirs(log_dir, exist_ok=True)
+# ─── 로그 디렉토리 설정 ─────────────────────────────
+LOG_DIR = os.path.expanduser("~/naver_logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+startup_log_path = os.path.join(LOG_DIR, "naver_rank_startup.log")
 
-LOG_PATH = os.path.join(log_dir, f"naver_rank_{ts}.log")
-ERR_PATH = os.path.join(log_dir, f"naver_rank_error.log")
+def write_startup_log(msg):
+    with open(startup_log_path, "a", encoding="utf-8") as f:
+        f.write(f"[{datetime.now()}] {msg}\n")
 
-sys.stdout = open(LOG_PATH, 'w', encoding='utf-8', buffering=1)
-sys.stderr = open(ERR_PATH, 'a', encoding='utf-8', buffering=1)
-# ───── 리디렉션 끝 ─────
+write_startup_log("앱 실행 시작됨")
 
 def get_base_dir():
     if getattr(sys, 'frozen', False):
@@ -38,11 +37,11 @@ def main():
     error_log = ""
 
     try:
-        # ─── 기본 디렉토리 ───────────────────────────────────
+        # ─── 기본 디렉토리 ─────────────────────────────
         base_dir = get_base_dir()
         log += f"[경로] base_dir: {base_dir}\n"
 
-        # ─── 엑셀 파일 탐색 ─────────────────────────────────────────
+        # ─── 엑셀 파일 탐색 ─────────────────────────────
         target_fname = unicodedata.normalize("NFC", "네이버_검색어.xlsx")
         excel_path = os.path.join(base_dir, target_fname)
         log += f"🔍 검사 중: {excel_path}\n"
@@ -50,15 +49,16 @@ def main():
             raise FileNotFoundError(f"{excel_path} 을(를) 찾을 수 없습니다.")
         log += "✅ 파일 발견!\n"
 
-        # ─── 엑셀 로딩 ─────────────────────────────────────────────
+        # ─── 엑셀 로딩 ─────────────────────────────
         df = pd.read_excel(excel_path)
         log += f"📁 엑셀 로딩 완료: {len(df)}개 레코드\n"
         if "키워드" not in df.columns or "링크" not in df.columns:
             raise ValueError("엑셀에 '키워드', '링크' 컬럼이 필요합니다.")
 
-        # ─── 셀레니움 & 크롤링 설정 ─────────────────────────────────
+        # ─── 셀레니움 & 크롤링 설정 ─────────────────────────────
         target_classes = {
-            "info_title", "link_tit", "link_question", "title_link", "fds-comps-right-image-text-title"
+            "info_title", "link_tit", "link_question", "title_link",
+            "fds-comps-right-image-text-title"
         }
         anchor_selector = ",".join(f"a[class*='{c}']" for c in target_classes)
 
@@ -76,7 +76,6 @@ def main():
             target_url = str(row.링크).strip()
             log += f"\n[{idx:>2}] ✅ 키워드 '{keyword}' 검색 중…\n"
 
-            # 네이버 검색
             driver.get("https://www.naver.com")
             wait.until(EC.presence_of_element_located((By.NAME, "query")))
             box = driver.find_element(By.NAME, "query")
@@ -84,7 +83,6 @@ def main():
             box.send_keys(keyword)
             box.send_keys(Keys.RETURN)
 
-            # 결과 로딩 대기
             wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.api_subject_bx")))
             blocks = driver.find_elements(By.CSS_SELECTOR, "div.api_subject_bx")
             log += f"   ▶ 그룹 블록 {len(blocks)}개 확인\n"
@@ -100,8 +98,8 @@ def main():
                         ).text.strip()
                     except:
                         group_title = "그룹명 없음"
-                log += f"   [그룹{b_idx}] {group_title}\n"
 
+                log += f"   [그룹{b_idx}] {group_title}\n"
                 anchors = block.find_elements(By.CSS_SELECTOR, anchor_selector)
                 log += f"      · 앵커 {len(anchors)}개 추출\n"
                 for rank, a in enumerate(anchors, start=1):
@@ -110,7 +108,6 @@ def main():
                     log += f"        {rank:>2}. {text} → {href}\n"
 
                     if normalize_url(target_url) in normalize_url(href):
-                        # 등록일 추출
                         date_candidates = []
                         for sel in [
                             "div.profile_bx span.etc.date",
@@ -119,13 +116,13 @@ def main():
                             "span.fds-info-sub-inner-text",
                         ]:
                             try:
-                                val = block.find_element(By.CSS_SELECTOR, sel).text.strip()
-                                date_candidates.append(val)
+                                date_candidates.append(
+                                    block.find_element(By.CSS_SELECTOR, sel).text.strip()
+                                )
                             except:
                                 pass
                         date_text = date_candidates[-1].rstrip(".") if date_candidates else "등록일 없음"
                         log += f"        → 매칭! 순위={rank}, 등록일={date_text}\n"
-
                         results.append({
                             "키워드": keyword,
                             "링크": href,
@@ -152,31 +149,48 @@ def main():
 
         driver.quit()
 
-        # ─── 결과 저장 ─────────────────────────────────────────────
+        # ─── 결과 저장 ─────────────────────────────
         out_dir = os.path.join(base_dir, "outputs")
         os.makedirs(out_dir, exist_ok=True)
         now = datetime.now().strftime("%Y%m%d_%H%M")
         out_path = os.path.join(out_dir, f"네이버_순위체크_크롤링_{now}.xlsx")
-        pd.DataFrame(results, columns=["키워드","링크","그룹명","글제목","등록일","금일 순위"]) \
-          .to_excel(out_path, index=False)
+        pd.DataFrame(results, columns=["키워드", "링크", "그룹명", "글제목", "등록일", "금일 순위"]).to_excel(out_path, index=False)
         log += f"\n✅ 결과 저장 완료: {out_path}\n"
 
     except Exception as e:
-        error_log = f"\n❌ 오류 발생: {e}\n" + traceback.format_exc()
-        with open(ERR_PATH, "a", encoding="utf-8") as f:
+        error_log += f"\n❌ 오류 발생: {e}\n"
+        error_log += traceback.format_exc() + "\n"
+
+    # ─── 로그 저장 ─────────────────────────────
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = os.path.join(LOG_DIR, f"naver_rank_{ts}_log.txt")
+    with open(log_path, "w", encoding="utf-8") as f:
+        f.write(log)
+    print(f"\n📝 로그 저장: {log_path}")
+
+    if error_log:
+        err_path = os.path.join(LOG_DIR, "naver_rank_error_log.txt")
+        with open(err_path, "a", encoding="utf-8") as f:
             f.write(f"\n[{ts}]\n")
             f.write(error_log)
-        log += f"⚠️ 에러 발생, 자세한 내용은 error_log 확인\n"
+        print(f"⚠️ 에러 로그 기록: {err_path}")
 
-    # ─── 로그 출력 경로 안내 ─────
-    print(log)
-    print(f"\n📝 로그 저장: {LOG_PATH}")
-    if os.path.exists(ERR_PATH):
-        print(f"⚠️ 에러 로그 확인: {ERR_PATH}")
+        # 콘솔 자동 열기 (macOS)
+        if sys.platform == "darwin":
+            os.system(f"open '{err_path}'")
 
-    # macOS에서 콘솔로 열기
-    if sys.platform == "darwin":
-        os.system(f"open '{LOG_PATH}'")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        # 진입조차 실패한 경우
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        fatal_path = os.path.join(LOG_DIR, f"naver_rank_fatal_{ts}.txt")
+        with open(fatal_path, "w", encoding="utf-8") as f:
+            f.write("🔥 앱 실행 직후 치명적 오류 발생\n")
+            f.write(f"{e}\n\n")
+            f.write(traceback.format_exc())
+        os.system(f"open '{fatal_path}'")
+        sys.exit(1)
