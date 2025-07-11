@@ -16,7 +16,8 @@ from selenium.webdriver.support import expected_conditions as EC
 
 def get_executable_dir():
     if getattr(sys, 'frozen', False):
-        return os.path.dirname(sys.executable)
+        # py2app 실행 환경일 때는 .app이 위치한 폴더를 정확히 지정
+        return os.path.abspath(os.path.join(os.path.dirname(sys.executable), "../.."))
     return os.path.dirname(os.path.abspath(__file__))
 
 
@@ -29,7 +30,7 @@ error_log = ""
 
 try:
     exe_dir = get_executable_dir()
-    base_dir = os.path.abspath(os.path.join(exe_dir, ".."))  # ⬅️ 수정된 부분
+    base_dir = exe_dir  # 그냥 exe_dir을 그대로 사용
     now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_path = os.path.join(exe_dir, f"log_{now_str}.txt")
     err_path = os.path.join(exe_dir, "error_log.txt")
