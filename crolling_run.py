@@ -13,6 +13,14 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+# 홈 디렉토리에 로그 파일 열기
+logfile = os.path.expanduser("~/NaverRankChecker_launch.log")
+f = open(logfile, "a", encoding="utf-8")
+# stdout, stderr 를 모두 여기에 붙여쓰기
+sys.stdout = f
+sys.stderr = f
+print(f"\n===== Launch at {datetime.now()} =====", flush=True)
+
 def get_base_dir():
     if getattr(sys, 'frozen', False):
         exe_dir = os.path.dirname(sys.executable)
