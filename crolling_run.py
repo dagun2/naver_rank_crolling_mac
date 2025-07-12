@@ -12,6 +12,7 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import StaleElementReferenceException
 
 
 def get_executable_dir():
@@ -78,13 +79,15 @@ try:
         box.send_keys(Keys.RETURN)
 
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.api_subject_bx")))
+        found = False
+
         blocks = driver.find_elements(By.CSS_SELECTOR, "div.api_subject_bx")
         log += f"   ▶ 그룹 블록 {len(blocks)}개 확인\n"
-        found = False
 
         for b_idx in range(len(blocks)):
             try:
-                block = driver.find_elements(By.CSS_SELECTOR, "div.api_subject_bx")[b_idx]
+                blocks = driver.find_elements(By.CSS_SELECTOR, "div.api_subject_bx")  # 재탐색
+                block = blocks[b_idx]
 
                 try:
                     group_title = block.find_element(By.CSS_SELECTOR, "h2.title").text.strip()
@@ -95,7 +98,14 @@ try:
                         group_title = "그룹명 없음"
                 log += f"   [그룹{b_idx + 1}] {group_title}\n"
 
-                anchors = block.find_elements(By.CSS_SELECTOR, anchor_selector)
+                try:
+                    anchors = block.find_elements(By.CSS_SELECTOR, anchor_selector)
+                except StaleElementReferenceException:
+                    log += f"      · StaleElement 발생 → 앵커 재탐색 시도\n"
+                    blocks = driver.find_elements(By.CSS_SELECTOR, "div.api_subject_bx")
+                    block = blocks[b_idx]
+                    anchors = block.find_elements(By.CSS_SELECTOR, anchor_selector)
+
                 log += f"      · 앵커 {len(anchors)}개 추출\n"
 
                 for rank, a in enumerate(anchors, start=1):
