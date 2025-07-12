@@ -58,7 +58,7 @@ try:
 
     chrome_path = "/Users/david/.wdm/drivers/chromedriver/mac64/138.0.7204.94/chromedriver-mac-arm64/chromedriver"
     options = webdriver.ChromeOptions()
-    # options.add_argument("--headless")
+    options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
