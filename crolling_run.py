@@ -56,17 +56,16 @@ try:
     }
     anchor_selector = ",".join(f"a[class*='{c}']" for c in target_classes)
 
+    chrome_path = "/Users/david/.wdm/drivers/chromedriver/mac64/138.0.7204.94/chromedriver-mac-arm64/chromedriver"
     options = webdriver.ChromeOptions()
     # options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-    
-    driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=options
-    )
+    service = Service(executable_path=chrome_path)
+    driver = webdriver.Chrome(service=service, options=options)    
+
     wait = WebDriverWait(driver, 10)
 
     results = []
