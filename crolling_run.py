@@ -57,8 +57,12 @@ try:
     anchor_selector = ",".join(f"a[class*='{c}']" for c in target_classes)
 
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
+    # options.add_argument("--headless")
     options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+
+    
     driver = webdriver.Chrome(
         service=Service(ChromeDriverManager().install()),
         options=options
