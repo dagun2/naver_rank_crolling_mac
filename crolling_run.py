@@ -40,11 +40,14 @@ log = ""
 error_log = ""
 
 try:
+
     exe_dir = get_executable_dir()
     base_dir = exe_dir
+    files_dir = os.path.join(base_dir, "files")
+    os.makedirs(files_dir, exist_ok=True)
     now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_path = os.path.join(exe_dir, f"log_{now_str}.txt")
-    err_path = os.path.join(exe_dir, "error_log.txt")
+    log_path = os.path.join(files_dir, f"log_{now_str}.txt")
+    err_path = os.path.join(files_dir, "error_log.txt")
 
     log += f"[경로] base_dir: {base_dir}\n"
 
@@ -174,8 +177,6 @@ try:
     driver.quit()
 
     now = datetime.now().strftime("%Y%m%d_%H%M")
-    files_dir = os.path.join(base_dir, "files")
-    os.makedirs(files_dir, exist_ok=True)
 
     out_path = os.path.join(files_dir, f"네이버_순위체크_크롤링_{now}.xlsx")
     pd.DataFrame(results, columns=["키워드", "링크", "그룹명", "글제목", "등록일", "금일 순위"]) \
