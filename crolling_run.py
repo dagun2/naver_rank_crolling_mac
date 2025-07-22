@@ -45,9 +45,12 @@ try:
     base_dir = exe_dir
     files_dir = os.path.join(base_dir, "files")
     os.makedirs(files_dir, exist_ok=True)
+    logs_dir = os.path.join(base_dir, "logs")
+    os.makedirs(files_dir, exist_ok=True)
+    
     now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_path = os.path.join(files_dir, f"log_{now_str}.txt")
-    err_path = os.path.join(files_dir, "error_log.txt")
+    log_path = os.path.join(logs_dir, f"log_{now_str}.txt")
+    err_path = os.path.join(logs_dir, "error_log.txt")
 
     log += f"[경로] base_dir: {base_dir}\n"
 
@@ -71,7 +74,7 @@ try:
 
     #chrome_path = "/Users/david/.wdm/drivers/chromedriver/mac64/138.0.7204.94/chromedriver-mac-arm64/chromedriver"
     options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
+    #options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
@@ -79,7 +82,7 @@ try:
     service = Service(executable_path=CHROMEDRIVER_PATH)
     driver = webdriver.Chrome(service=service, options=options)
 
-    wait = WebDriverWait(driver, 10)
+    wait = WebDriverWait(driver, 20)
 
     results = []
     for idx, row in enumerate(df.itertuples(index=False), start=1):
@@ -183,9 +186,9 @@ try:
         .to_excel(out_path, index=False)
     log += f"\n✅ 결과 저장 완료: {out_path}\n"
 
-    with open(log_path, "w", encoding="utf-8") as f:
-        f.write(log)
-    print(f"\n📝 로그 저장: {log_path}")
+    #with open(log_path, "w", encoding="utf-8") as f:
+    #    f.write(log)
+    #print(f"\n📝 로그 저장: {log_path}")
 
 except Exception as e:
     error_log += f"\n❌ 오류 발생: {e}\n"
@@ -195,7 +198,7 @@ except Exception as e:
     os.makedirs(files_dir, exist_ok=True)
 
     now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    err_path = os.path.join(files_dir, "error_log.txt")
+    err_path = os.path.join(logs_dir, "error_log.txt")
     with open(err_path, "a", encoding="utf-8") as f:
         f.write(f"\n[{now_str}]\n")
         f.write(error_log)
