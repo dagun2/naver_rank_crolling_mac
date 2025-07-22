@@ -174,7 +174,10 @@ try:
     driver.quit()
 
     now = datetime.now().strftime("%Y%m%d_%H%M")
-    out_path = os.path.join(base_dir, f"네이버_순위체크_크롤링_{now}.xlsx")
+    files_dir = os.path.join(base_dir, "files")
+    os.makedirs(files_dir, exist_ok=True)
+
+    out_path = os.path.join(files_dir, f"네이버_순위체크_크롤링_{now}.xlsx")
     pd.DataFrame(results, columns=["키워드", "링크", "그룹명", "글제목", "등록일", "금일 순위"]) \
         .to_excel(out_path, index=False)
     log += f"\n✅ 결과 저장 완료: {out_path}\n"
@@ -187,9 +190,11 @@ except Exception as e:
     error_log += f"\n❌ 오류 발생: {e}\n"
     error_log += traceback.format_exc() + "\n"
 
-    exe_dir = get_executable_dir()
+    files_dir = os.path.join(get_executable_dir(), "files")
+    os.makedirs(files_dir, exist_ok=True)
+
     now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-    err_path = os.path.join(exe_dir, "error_log.txt")
+    err_path = os.path.join(files_dir, "error_log.txt")
     with open(err_path, "a", encoding="utf-8") as f:
         f.write(f"\n[{now_str}]\n")
         f.write(error_log)
