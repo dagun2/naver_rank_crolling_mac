@@ -1,7 +1,9 @@
 from setuptools import setup
 
 APP = ['crolling_run.py']
-DATA_FILES = []
+DATA_FILES = [
+    ('resources', ['resources/chromedriver'])
+]
 
 OPTIONS = {
     'argv_emulation': False,
