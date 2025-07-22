@@ -21,6 +21,17 @@ def get_executable_dir():
     else:
         return os.path.dirname(os.path.abspath(__file__))
 
+def resource_path(relative_path):
+    # .app 실행 시 base path는 Contents/MacOS
+    if getattr(sys, 'frozen', False):
+        base_path = os.path.abspath(os.path.join(os.path.dirname(sys.executable), "../Resources"))
+    else:
+        base_path = os.path.dirname(__file__)
+    return os.path.join(base_path, relative_path)
+
+# 이 경로에 chromedriver가 위치해야 합니다
+CHROMEDRIVER_PATH = resource_path("resources/chromedriver")
+
 
 def normalize_url(url: str) -> str:
     return url.replace("http://", "").replace("https://", "").rstrip("/")
@@ -56,15 +67,15 @@ try:
     }
     anchor_selector = ",".join(f"a[class*='{c}']" for c in target_classes)
 
-    chrome_path = "/Users/david/.wdm/drivers/chromedriver/mac64/138.0.7204.94/chromedriver-mac-arm64/chromedriver"
+    #chrome_path = "/Users/david/.wdm/drivers/chromedriver/mac64/138.0.7204.94/chromedriver-mac-arm64/chromedriver"
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-
-    service = Service(executable_path=chrome_path)
-    driver = webdriver.Chrome(service=service, options=options)    
+ 
+    service = Service(executable_path=CHROMEDRIVER_PATH)
+    driver = webdriver.Chrome(service=service, options=options)
 
     wait = WebDriverWait(driver, 10)
 
