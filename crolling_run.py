@@ -96,6 +96,7 @@ try:
         box.clear()
         box.send_keys(keyword)
         box.send_keys(Keys.RETURN)
+        time.sleep(random.uniform(10, 12))
 
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.api_subject_bx")))
         found = False
