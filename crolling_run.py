@@ -98,9 +98,9 @@ try:
         box.clear()
         box.send_keys(keyword)
         box.send_keys(Keys.RETURN)
-        time.sleep(random.uniform(10, 12))
 
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.api_subject_bx")))
+        time.sleep(random.uniform(1.5, 3.0))
         found = False
 
         blocks = driver.find_elements(By.CSS_SELECTOR, "div.api_subject_bx")
@@ -199,6 +199,9 @@ except Exception as e:
 
     files_dir = os.path.join(get_executable_dir(), "files")
     os.makedirs(files_dir, exist_ok=True)
+
+    err_dir = os.path.join(exe_dir, "logs")
+    os.makedirs(err_dir, exist_ok=True)
 
     now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
     err_path = os.path.join(logs_dir, "error_log.txt")
