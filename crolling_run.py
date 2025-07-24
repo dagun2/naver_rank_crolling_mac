@@ -100,7 +100,7 @@ try:
         box.send_keys(Keys.RETURN)
 
         wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.api_subject_bx")))
-        time.sleep(random.uniform(1.5, 3.0))
+        time.sleep(random.uniform(3.0, 5.0))
         found = False
 
         blocks = driver.find_elements(By.CSS_SELECTOR, "div.api_subject_bx")
