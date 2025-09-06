@@ -1,35 +1,23 @@
 import os
-import re
+import sys
+import unicodedata
+import traceback
 import time
 import random
-import shutil
 import pandas as pd
-import sys
-import logging
-import platform
-import subprocess
-import tempfile
 from datetime import datetime
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import (
-    UnexpectedAlertPresentException,
-    NoAlertPresentException,
-    TimeoutException,
-    NoSuchWindowException,
-    InvalidSessionIdException,
-    StaleElementReferenceException,
-    WebDriverException,
-)
+from selenium.webdriver.common.keys import Keys
+# ❌ from selenium.webdriver.chrome.service import Service  # (제거)
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.options import Options
-from pandas import ExcelWriter
+from selenium.common.exceptions import StaleElementReferenceException
 
-# =========================
-# 경로 유틸 (입력 엑셀은 절대 변경 X)
-# =========================
+# -------------------------
+# 경로 유틸 (그대로 유지)
+# -------------------------
 def get_executable_dir():
     if getattr(sys, 'frozen', False):
         return os.path.abspath(os.path.join(os.path.dirname(sys.executable), "../../../"))
@@ -37,293 +25,197 @@ def get_executable_dir():
         return os.path.dirname(os.path.abspath(__file__))
 
 def resource_path(relative_path):
-    # .app 실행 시 base path는 Contents/MacOS가 됨
+    # .app 실행 시 base path는 Contents/MacOS
     if getattr(sys, 'frozen', False):
         base_path = os.path.abspath(os.path.join(os.path.dirname(sys.executable), "../Resources"))
     else:
         base_path = os.path.dirname(__file__)
     return os.path.join(base_path, relative_path)
 
+# ❌ (Selenium Manager 사용: 더 이상 chromedriver 번들/경로 필요 없음)
+# CHROMEDRIVER_PATH = resource_path("resources/chromedriver")
 
-# =========================
-# 기본 경로/파일 (입력/출력 경로는 기존 유지)
-# =========================
-BASE_DIR = get_executable_dir()
+# (선택) Selenium Manager 로그 보고 싶으면 켜기
+# os.environ["SELENIUM_MANAGER_LOG"] = "DEBUG"
 
-URL_FILE_PATH = os.path.join(BASE_DIR, "네이버_검색어.xlsx")  # 입력 엑셀: 위치 그대로 유지
-FILES_DIR = os.path.join(BASE_DIR, "files")                  # 출력 폴더
-os.makedirs(FILES_DIR, exist_ok=True)
+def normalize_url(url: str) -> str:
+    return url.replace("http://", "").replace("https://", "").rstrip("/")
 
-LOGS_DIR = os.path.join(BASE_DIR, "logs")                    # 로그 폴더
-os.makedirs(LOGS_DIR, exist_ok=True)
-
-current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-today_prefix = datetime.now().strftime("%Y%m%d")
-
-# 출력 엑셀 파일명(요청: "_수집" 제거) - 기존 규칙 유지
-OUTPUT_XLSX = os.path.join(FILES_DIR, f"카페글_조회수_{current_time}.xlsx")
-
-# =========================
-# 로깅 설정 (파일 + 콘솔)
-# =========================
-LOG_FILE = os.path.join(LOGS_DIR, f"run_{current_time}.txt")
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE, encoding="utf-8"),
-        logging.StreamHandler(sys.stdout),
-    ],
-)
-log = logging.getLogger("crawler")
-
-log.info(f"BASE_DIR: {BASE_DIR}")
-log.info(f"INPUT  : {URL_FILE_PATH}")
-log.info(f"OUTPUT : {OUTPUT_XLSX}")
-log.info(f"LOG    : {LOG_FILE}")
-
-# =========================
-# Selenium (크롬 버전 독립 실행: Selenium Manager 사용)
-# =========================
-# 임시 사용자 데이터 디렉터리로 세션/캐시 격리 (매 실행 독립, 로그인 유지 X)
-TMP_PROFILE_DIR = tempfile.mkdtemp(prefix="nrk_chrome_")
-
-chrome_options = Options()
-chrome_options.add_argument("--disable-gpu")
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
-chrome_options.add_argument("--window-size=1280,900")
-chrome_options.add_argument(f"--user-data-dir={TMP_PROFILE_DIR}")
-chrome_options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
-chrome_options.add_experimental_option("useAutomationExtension", False)
-# DOM 로드까지만(이미지/서브리소스 기다리지 않음)
-chrome_options.page_load_strategy = "eager"
-# 필요 시 헤드리스: chrome_options.add_argument("--headless=new")
-
-# ✅ 핵심: Service(executable_path=...) 미지정 → Selenium Manager 자동 매칭
-# (동봉된 chromedriver를 절대 강제 사용하지 않음)
-driver = webdriver.Chrome(options=chrome_options)
-driver.set_page_load_timeout(25)
-wait = WebDriverWait(driver, 15)
-
-# =========================
-# 보조 함수
-# =========================
-def safe_int_from_text(t: str) -> int:
-    nums = re.findall(r"\d+", t or "")
-    return int(nums[0]) if nums else 0
-
-def open_log_after_finish(path: str):
-    """작업 후 OS에서 로그 파일 열기"""
-    try:
-        if platform.system() == "Darwin":
-            subprocess.run(["open", path], check=False)
-        elif platform.system() == "Windows":
-            os.startfile(path)  # type: ignore
-        else:
-            subprocess.run(["xdg-open", path], check=False)
-    except Exception as e:
-        log.warning(f"로그 자동 열기 실패(무시 가능): {e}")
-
-def human_delay(min_s=0.6, max_s=1.4):
-    time.sleep(random.uniform(min_s, max_s))
-
-def pause_between_pages():
-    sec = random.uniform(3.0, 5.0)
-    log.info(f"다음 페이지로 넘어가기 전 대기: {sec:.2f}s")
-    time.sleep(sec)
-
-def switch_to_last_window(drv: webdriver.Chrome):
-    try:
-        handles = drv.window_handles
-        if handles:
-            drv.switch_to.window(handles[-1])
-    except Exception as e:
-        log.debug(f"윈도우 전환 실패(무시): {e}")
-
-
-def close_and_cleanup_driver():
-    try:
-        try:
-            driver.quit()
-        except Exception:
-            pass
-    finally:
-        # 임시 프로필 정리
-        try:
-            shutil.rmtree(TMP_PROFILE_DIR, ignore_errors=True)
-        except Exception:
-            pass
-
-# =========================
-# 로그인 (매 실행 새 로그인 OK)
-# =========================
-try:
-    driver.get("https://www.naver.com")
-    log.info("네이버 접속. 로그인 대기 최대 60초(세션 재사용 안 함, 수동 로그인).")
-    # 수동 로그인 대기 (고정 슬립 + 조기 통과 조건 병행)
-    start = time.time()
-    while True:
-        # 로그인 완료 힌트: 메인 바디 존재 && 로그인 버튼이 사라졌거나, 내정보/프로필 요소가 보이는 경우 등
-        try:
-            body_ok = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "body")))
-            if body_ok:
-                # 조기 통과 조건(보수적으로 2초 쉰 뒤 종료)
-                time.sleep(2)
-                break
-        except TimeoutException:
-            pass
-        if time.time() - start > 60:
-            break
-        time.sleep(1)
-except TimeoutException:
-    log.warning("네이버 첫 페이지 로드 타임아웃. 계속 진행합니다.")
-
-human_delay(1.0, 2.0)
-
-# =========================
-# 입력 엑셀 읽기 (경로/포맷 고정)
-# =========================
-if not os.path.exists(URL_FILE_PATH):
-    log.error("입력 엑셀(네이버_검색어.xlsx)이 존재하지 않습니다. 작업을 종료합니다.")
-    close_and_cleanup_driver()
-    sys.exit(1)
+log = ""
+error_log = ""
 
 try:
-    cafe_df = pd.read_excel(URL_FILE_PATH)
-except Exception as e:
-    log.error(f"입력 엑셀 로드 실패: {e}")
-    close_and_cleanup_driver()
-    sys.exit(1)
+    exe_dir = get_executable_dir()
+    base_dir = exe_dir
 
-# 필수 컬럼 점검
-if not set(["키워드", "링크"]).issubset(set(cafe_df.columns)):
-    log.error("입력 엑셀에 '키워드', '링크' 컬럼이 필요합니다.")
-    close_and_cleanup_driver()
-    sys.exit(1)
+    files_dir = os.path.join(base_dir, "files")
+    os.makedirs(files_dir, exist_ok=True)
 
-# =========================
-# 크롤링
-# =========================
-CAFE_VIEW_LIST = []
-total = len(cafe_df)
-log.info(f"총 {total}건 수집 시작")
+    logs_dir = os.path.join(base_dir, "logs")
+    os.makedirs(logs_dir, exist_ok=True)   # ✅ BUGFIX: 로그 폴더 제대로 생성
 
-try:
-    for idx, row in cafe_df.iterrows():
-        keyword = str(row.get("키워드", "")).strip()
-        visit_cafe_url = str(row["링크"]).strip()
+    now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_path = os.path.join(logs_dir, f"log_{now_str}.txt")
+    err_path = os.path.join(logs_dir, "error_log.txt")
 
-        log.info(f"[{idx+1}/{total}] 방문: {visit_cafe_url}")
+    log += f"[경로] base_dir: {base_dir}\n"
 
-        # 페이지 열기
-        try:
-            driver.get(visit_cafe_url)
-        except (TimeoutException,) as e:
-            log.warning(f"페이지 로드 타임아웃 → 0으로 기록하고 다음으로 진행: {e}")
-            CAFE_VIEW_LIST.append([keyword, visit_cafe_url, 0])
-            pause_between_pages()
-            continue
-        except (NoSuchWindowException, InvalidSessionIdException, WebDriverException) as e:
-            # 창/세션 이슈: 마지막 창으로 재전환 시도 후 한번 더 시도
-            log.warning(f"창/세션 이슈 감지(재시도): {e}")
+    target_fname = unicodedata.normalize("NFC", "네이버_검색어.xlsx")
+    excel_path = os.path.join(base_dir, target_fname)
+    log += f"🔍 검사 중: {excel_path}\n"
+    if not os.path.exists(excel_path):
+        raise FileNotFoundError(f"{excel_path} 을(를) 찾을 수 없습니다.")
+    log += "✅ 파일 발견!\n"
+
+    df = pd.read_excel(excel_path)
+    log += f"📁 엑셀 로딩 완료: {len(df)}개 레코드\n"
+    if "키워드" not in df.columns or "링크" not in df.columns:
+        raise ValueError("엑셀에 '키워드', '링크' 컬럼이 필요합니다.")
+
+    target_classes = {
+        "info_title", "link_tit", "link_question",
+        "title_link", "fds-comps-right-image-text-title"
+    }
+    anchor_selector = ",".join(f"a[class*='{c}']" for c in target_classes)
+
+    # -------------------------
+    # ✅ 핵심: Selenium Manager 사용 (경로 지정 X)
+    # -------------------------
+    options = webdriver.ChromeOptions()
+    # options.add_argument("--headless=new")  # 필요 시
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+
+    # ❌ service = Service(executable_path=CHROMEDRIVER_PATH)
+    # ❌ driver = webdriver.Chrome(service=service, options=options)
+    driver = webdriver.Chrome(options=options)  # ← 이 한 줄이면 자동 매칭
+
+    wait = WebDriverWait(driver, 20)
+
+    results = []
+    for idx, row in enumerate(df.itertuples(index=False), start=1):
+        keyword = str(row.키워드).strip()
+        target_url = str(row.링크).strip()
+        log += f"\n[{idx:>2}] ✅ 키워드 '{keyword}' 검색 중…\n"
+
+        driver.get("https://www.naver.com")
+        wait.until(EC.presence_of_element_located((By.NAME, "query")))
+        box = driver.find_element(By.NAME, "query")
+        box.clear()
+        box.send_keys(keyword)
+        box.send_keys(Keys.RETURN)
+
+        wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "div.api_subject_bx")))
+        time.sleep(random.uniform(3.0, 5.0))
+        found = False
+
+        blocks = driver.find_elements(By.CSS_SELECTOR, "div.api_subject_bx")
+        log += f"   ▶ 그룹 블록 {len(blocks)}개 확인\n"
+
+        for b_idx in range(len(blocks)):
             try:
-                switch_to_last_window(driver)
-                driver.get(visit_cafe_url)
-            except Exception as e2:
-                log.warning(f"재시도 실패 → 0으로 기록: {e2}")
-                CAFE_VIEW_LIST.append([keyword, visit_cafe_url, 0])
-                pause_between_pages()
+                blocks = driver.find_elements(By.CSS_SELECTOR, "div.api_subject_bx")  # 재탐색
+                block = blocks[b_idx]
+
+                try:
+                    group_title = block.find_element(By.CSS_SELECTOR, "h2.title").text.strip()
+                except:
+                    try:
+                        group_title = block.find_element(By.CSS_SELECTOR, "span.fds-comps-header-headline").text.strip()
+                    except:
+                        group_title = "그룹명 없음"
+                log += f"   [그룹{b_idx + 1}] {group_title}\n"
+
+                try:
+                    anchors = block.find_elements(By.CSS_SELECTOR, anchor_selector)
+                except StaleElementReferenceException:
+                    log += f"      · StaleElement 발생 → 앵커 재탐색 시도\n"
+                    blocks = driver.find_elements(By.CSS_SELECTOR, "div.api_subject_bx")
+                    block = blocks[b_idx]
+                    anchors = block.find_elements(By.CSS_SELECTOR, anchor_selector)
+
+                log += f"      · 앵커 {len(anchors)}개 추출\n"
+
+                for rank, a in enumerate(anchors, start=1):
+                    href = a.get_attribute("href") or ""
+                    text = a.text.strip()
+                    log += f"        {rank:>2}. {text} → {href}\n"
+
+                    if normalize_url(target_url) in normalize_url(href):
+                        date_candidates = []
+                        for sel in [
+                            "div.profile_bx span.etc.date",
+                            "div.user_info span.sub",
+                            "span.etc.date",
+                            "span.fds-info-sub-inner-text",
+                        ]:
+                            try:
+                                val = block.find_element(By.CSS_SELECTOR, sel).text.strip()
+                                date_candidates.append(val)
+                            except:
+                                pass
+                        date_text = date_candidates[-1].rstrip(".") if date_candidates else "등록일 없음"
+                        log += f"        → 매칭! 순위={rank}, 등록일={date_text}\n"
+
+                        results.append({
+                            "키워드": keyword,
+                            "링크": href,
+                            "그룹명": group_title,
+                            "글제목": text,
+                            "등록일": date_text,
+                            "금일 순위": rank,
+                        })
+                        found = True
+                        break
+
+                if found:
+                    break
+
+            except Exception as e:
+                log += f"   [그룹{b_idx + 1}] 오류 발생: {e}\n"
                 continue
 
-        # iframe 진입 및 조회수 파싱
-        count = 0
-        try:
-            iframe = wait.until(EC.presence_of_element_located((By.ID, "cafe_main")))
-            driver.switch_to.frame(iframe)
+        if not found:
+            log += "        → 매칭된 글 없음\n"
+            results.append({
+                "키워드": keyword,
+                "링크": target_url,
+                "그룹명": "순위에 없음",
+                "글제목": "순위에 없음",
+                "등록일": "순위에 없음",
+                "금일 순위": "순위에 없음",
+            })
 
-            # 조회수 요소 탐색(텍스트/클래스 모두 대응)
-            xpath_candidates = [
-                "//span[contains(., '조회')]",
-                "//*[contains(@class,'view') and (self::span or self::em or self::div)]",
-                "//*[contains(@class,'count') and (self::span or self::em or self::div)]",
-            ]
+    driver.quit()
 
-            elem = None
-            for xp in xpath_candidates:
-                try:
-                    elem = WebDriverWait(driver, 6).until(
-                        EC.presence_of_element_located((By.XPATH, xp))
-                    )
-                    text = (elem.text or "").strip()
-                    val = safe_int_from_text(text)
-                    if val > 0:
-                        count = val
-                        break
-                except TimeoutException:
-                    continue
-                except StaleElementReferenceException:
-                    # 프레임 내 재탐색
-                    try:
-                        driver.switch_to.default_content()
-                        iframe = wait.until(EC.presence_of_element_located((By.ID, "cafe_main")))
-                        driver.switch_to.frame(iframe)
-                    except Exception:
-                        pass
+    now = datetime.now().strftime("%Y%m%d_%H%M")
+    out_path = os.path.join(files_dir, f"네이버_순위체크_크롤링_{now}.xlsx")
+    pd.DataFrame(results, columns=["키워드", "링크", "그룹명", "글제목", "등록일", "금일 순위"]).to_excel(out_path, index=False)
+    log += f"\n✅ 결과 저장 완료: {out_path}\n"
 
-            # 백업 XPath 한 번 더
-            if count == 0:
-                try:
-                    backup = driver.find_element(By.XPATH, "/html/body/div/div/div/div[2]/div[1]/div[2]/div[2]/div[2]/span[2]")
-                    count = safe_int_from_text((backup.text or "").strip())
-                except Exception:
-                    pass
+    # (원하면 로그 파일 쓰기)
+    # with open(log_path, "w", encoding="utf-8") as f:
+    #     f.write(log)
+    # print(f"\n📝 로그 저장: {log_path}")
 
-            if count == 0:
-                log.warning(f"조회수 추출 실패(0으로 기록) URL: {visit_cafe_url}")
-            else:
-                log.info(f"▶ 조회수: {count}")
+except Exception as e:
+    error_log += f"\n❌ 오류 발생: {e}\n"
+    error_log += traceback.format_exc() + "\n"
 
-        except UnexpectedAlertPresentException:
-            try:
-                alert = driver.switch_to.alert
-                log.warning(f"Alert 감지: {alert.text}")
-                alert.accept()
-            except NoAlertPresentException:
-                pass
-        except (NoSuchWindowException, InvalidSessionIdException) as e:
-            log.warning(f"프레임/파싱 중 세션 이슈 → 0 기록: {e}")
-            count = 0
-        except Exception as e:
-            log.warning(f"iframe/파싱 실패: {e}")
-        finally:
-            # 프레임 상태 복구
-            try:
-                driver.switch_to.default_content()
-            except Exception:
-                pass
+    # ✅ 에러 로그 경로 처리 정리
+    exe_dir = get_executable_dir()
+    err_dir = os.path.join(exe_dir, "logs")
+    os.makedirs(err_dir, exist_ok=True)
 
-        CAFE_VIEW_LIST.append([keyword, visit_cafe_url, count])
+    now_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    err_path = os.path.join(err_dir, "error_log.txt")  # ✅ BUGFIX: logs_dir → err_dir
+    with open(err_path, "a", encoding="utf-8") as f:
+        f.write(f"\n[{now_str}]\n")
+        f.write(error_log)
+    print(f"⚠️ 에러 로그 기록: {err_path}")
 
-        # 페이지 전환 사이 필수 대기(3~5초)
-        pause_between_pages()
+    if sys.platform == "darwin":
+        os.system(f"open '{err_path}'")
 
-finally:
-    close_and_cleanup_driver()
-
-# =========================
-# 오늘자 결과 엑셀 저장 (누적 관련 전부 제거)
-# =========================
-if CAFE_VIEW_LIST:
-    df_today = pd.DataFrame(CAFE_VIEW_LIST, columns=["키워드", "링크", today_prefix])
-    try:
-        with ExcelWriter(OUTPUT_XLSX, engine="xlsxwriter") as writer:
-            df_today.to_excel(writer, index=False, sheet_name="조회수기록")
-        log.info(f"✅ 결과 저장 완료: {OUTPUT_XLSX}")
-    except Exception as e:
-        log.error(f"엑셀 저장 실패: {e}")
-else:
-    log.warning("⚠️ 저장할 데이터가 없습니다(수집 결과 0건).")
-
-log.info("모든 작업 완료. 로그 파일을 열겠습니다.")
-open_log_after_finish(LOG_FILE)
+    sys.exit(1)
