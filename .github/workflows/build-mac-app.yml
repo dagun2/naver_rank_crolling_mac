@@ -11,6 +11,10 @@ jobs:
   build:
     runs-on: macos-latest
 
+    env:
+      # ✅ Selenium Manager 진단 로그
+      SELENIUM_MANAGER_LOG: DEBUG
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,27 +23,48 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          cache: 'pip'  # ✅ pip 캐시
+          cache: 'pip'
 
+      # ✅ Google Chrome 설치 (러너 기본 미포함)
+      - name: Install Google Chrome
+        run: |
+          brew update
+          brew install --cask google-chrome
+          /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --version
+
+      # ✅ 혹시 PATH에 남아있는 chromedriver 제거(있다면)
+      - name: Remove preinstalled chromedriver (if any)
+        run: |
+          if command -v chromedriver >/dev/null 2>&1; then
+            echo "Found chromedriver on PATH. Removing..."
+            brew uninstall --cask chromedriver || true
+          else
+            echo "No chromedriver on PATH. OK"
+          fi
+
+      # ✅ 의존성 설치 (py2app 명시 설치)
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # 명시적으로 py2app 설치(안전)
           pip install py2app
+          python -c "import selenium,sys;print('Selenium', selenium.__version__)"
 
+      # ✅ 클린 빌드
       - name: Clean old build
         run: rm -rf build dist *.egg-info
 
+      # ✅ 빌드
       - name: Build app with py2app
         run: python setup.py py2app
 
+      # ✅ 패키징
       - name: Zip the app
         run: |
           cd dist
           zip -r NaverRankChecker.zip NaverRankChecker.app
 
-      # ✅ 항상 CI 아티팩트로 업로드 (릴리스 여부와 무관)
+      # ✅ 아티팩트 업로드(항상)
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
@@ -48,7 +73,7 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      # ✅ push/workflow_dispatch에서 새 릴리스 생성
+      # ✅ push/workflow_dispatch → 새 릴리스 생성
       - name: Create GitHub Release and Upload (auto-tag)
         if: ${{ github.event_name != 'release' }}
         uses: softprops/action-gh-release@v2
@@ -59,7 +84,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ✅ release 이벤트로 실행된 경우, 해당 릴리스에 업로드만
+      # ✅ release 이벤트 → 기존 릴리스에 업로드
       - name: Upload to existing Release (release event)
         if: ${{ github.event_name == 'release' }}
         uses: softprops/action-gh-release@v2
