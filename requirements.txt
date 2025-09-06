@@ -1,4 +1,4 @@
-selenium
-webdriver-manager
+selenium>=4.14.0
 pandas
 openpyxl
+xlsxwriter
